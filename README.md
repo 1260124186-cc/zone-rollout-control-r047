@@ -64,6 +64,17 @@ curl -sS -X PUT http://127.0.0.1:8090/v1/nodes \
   }'
 ```
 
+按名称受控更新节点档案（需提交当前版本）：
+
+```bash
+curl -sS -X PATCH http://127.0.0.1:8090/v1/nodes/resolver-east-01 \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "region": "west",
+    "expected_version": 1
+  }'
+```
+
 创建滚动计划：
 
 ```bash
@@ -167,6 +178,7 @@ curl -sS -X PATCH http://127.0.0.1:8090/v1/plans/<plan_id>/assessments \
 | `GET` | `/healthz` | 进程健康检查 |
 | `PUT` | `/v1/nodes` | 登记解析节点 |
 | `GET` | `/v1/nodes` | 按状态和区域分页查询节点 |
+| `PATCH` | `/v1/nodes/{name}` | 按名称受控更新节点区域或隔离标记 |
 | `PUT` | `/v1/plans` | 创建计划草稿 |
 | `GET` | `/v1/plans` | 按状态分页查询计划 |
 | `GET` | `/v1/plans/{id}` | 查询计划 |
@@ -185,6 +197,9 @@ curl -sS -X PATCH http://127.0.0.1:8090/v1/plans/<plan_id>/assessments \
 - 区域版本只在计划草稿状态可追加，序列号严格递增且内容不可变。
 - A、AAAA、CNAME 条目在写入前规范化并稳定排序，重复条目直接拒绝。
 - 节点按 `ready -> leased -> ready` 变化，隔离节点不会被选中。
+- 节点档案可按名称受控更新：提交 `expected_version` 后才允许修改区域或隔离标记，版本不匹配返回 `version_conflict`。
+- 持有活动租约的节点拒绝更新并返回 `invalid_state`；已到期租约会在更新事务内先行过期清理。
+- 每次档案更新把字段前后值写入审计事件；节点标识与创建时间不变，历史租约仍引用当时节点资料。
 - 一个节点同一时刻最多有一个 `claimed` 租约。
 - 相同请求键和相同内容可安全重放；同键异载荷返回 `idempotency_conflict`。
 - 一致性判定综合节点覆盖率、序列号、成功比例和最大延迟，返回 `consistent` 或 `review_required`。
@@ -214,6 +229,7 @@ curl -sS -X PATCH http://127.0.0.1:8090/v1/plans/<plan_id>/assessments \
 ```bash
 go run ./cmd/workflowprobe plan-revision-lifecycle
 go run ./cmd/workflowprobe node-lease-allocation
+go run ./cmd/workflowprobe node-profile-update
 go run ./cmd/workflowprobe probe-ingestion
 go run ./cmd/workflowprobe consistency-assessment
 ```

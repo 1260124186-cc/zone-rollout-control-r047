@@ -114,6 +114,26 @@
       ]
     },
     {
+      "id": "node-profile-update",
+      "name": "Controlled node profile update",
+      "entry": "PATCH /v1/nodes/{name}",
+      "steps": [
+        "validate region, quarantine flag, and expected version",
+        "reject nodes with an active claimed lease and expire due leases first",
+        "apply region or quarantine changes without changing node identity",
+        "record before and after field values in the audit log"
+      ],
+      "success": "the node keeps its identifier, its version increments, and later allocations use the new region",
+      "failure": "leased nodes, stale versions, unknown names, and duplicate enrollment return stable errors without state changes",
+      "verification": "workflowprobe node-profile-update updates region and quarantine, rejects leased and stale updates, and checks audit history",
+      "module_ids": [
+        "httpapi",
+        "fleet",
+        "domain",
+        "storage"
+      ]
+    },
+    {
       "id": "probe-ingestion",
       "name": "Idempotent probe ingestion",
       "entry": "PATCH /v1/leases/{id}/probes",

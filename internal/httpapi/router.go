@@ -7,6 +7,7 @@ func (s *Server) routes(mux *http.ServeMux) {
 
 	mux.HandleFunc("PUT /v1/nodes", s.enrollNode)
 	mux.HandleFunc("GET /v1/nodes", s.listNodes)
+	mux.HandleFunc("PATCH /v1/nodes/{name}", s.updateNode)
 
 	mux.HandleFunc("PUT /v1/plans", s.createPlan)
 	mux.HandleFunc("GET /v1/plans", s.listPlans)

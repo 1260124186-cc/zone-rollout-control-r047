@@ -16,6 +16,8 @@ func Run(args []string, output io.Writer) error {
 		run = runPlanRevisionLifecycle
 	case "node-lease-allocation":
 		run = runNodeLeaseAllocation
+	case "node-profile-update":
+		run = runNodeProfileUpdate
 	case "probe-ingestion":
 		run = runProbeIngestion
 	case "consistency-assessment":
