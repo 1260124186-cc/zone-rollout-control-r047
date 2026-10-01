@@ -48,6 +48,8 @@ Zone Rollout Control 是面向 DNS 运维人员的 Go HTTP 控制面。它把区
 - `state`：`ready`、`leased` 或 `quarantined`。
 - `version`、`created_at`、`updated_at`。
 
+节点标识 `id` 在首次登记后永久不变。没有活动租约的 `ready` 节点可以按 `node_name` 做受控档案更新（更换区域或隔离升级），更新必须提交当前 `version`，成功后版本递增；首次登记的重名冲突行为保持不变。
+
 ### NodeLease
 
 计划对某个解析节点的有期限占用。
@@ -107,6 +109,16 @@ ready --lease--> leased --report--> ready
 - 一个节点同一时刻最多有一个 `claimed` 租约。
 - 租约到期后不能提交探针。
 - 首次有效探针完成后，租约转为 `reported`，节点恢复 `ready`。
+
+### 节点档案受控更新
+
+- 入口 `PATCH /v1/nodes`，按当前 `node_name` 定位节点，提交 `region`、`quarantine` 和 `expected_version`。
+- 只有没有活动租约的 `ready` 节点可以更新；事务内先清理到期租约，仍持有 `claimed` 租约的 `leased` 节点返回 `invalid_state`。
+- `expected_version` 必须等于节点当前 `version`，否则返回 `version_conflict`，不修改状态。
+- 更新不改变节点 `id`；只允许从 `ready` 隔离升级为 `quarantined`，已经隔离的档案锁定，不能修改也不能解除隔离。
+- 字段前后值（`before`/`after` 与逐字段 `changes`）写入审计事件；内容无变化时为幂等成功，不递增版本。
+- 更新后的区域用于后续分配；历史租约仍通过不变的节点标识引用同一节点资料。
+- 名称不存在返回 `not_found`；首次登记 `PUT /v1/nodes` 的重名 `conflict` 与其他错误保持兼容。
 
 ### 区域版本规则
 
@@ -212,6 +224,21 @@ ready --lease--> leased --report--> ready
 
 失败行为：缺少区域版本、没有探针、请求键冲突或保存失败不会更新计划摘要。
 
+### W5 节点档案受控更新
+
+入口：`PATCH /v1/nodes`。
+
+步骤：
+
+1. HTTP 层严格解码 JSON。
+2. 舰队服务规范化名称与区域并校验当前版本。
+3. 存储层在锁内清理到期租约、按名称定位节点并检查版本与状态。
+4. 写入新区域或隔离升级，版本递增，审计记录字段前后值，再原子替换快照。
+
+成功行为：节点标识不变，版本递增，后续分配使用新区域；无实际变化时幂等返回当前档案。
+
+失败行为：名称不存在、版本过期、节点已租出或已隔离时返回明确错误，不修改状态。
+
 ## 6. 模块边界
 
 | 模块 | 路径 | 责任 |
@@ -248,6 +275,7 @@ ready --lease--> leased --report--> ready
 
 - `GET /healthz`
 - `PUT /v1/nodes`
+- `PATCH /v1/nodes`
 - `GET /v1/nodes`
 - `PUT /v1/plans`
 - `GET /v1/plans`
@@ -282,5 +310,6 @@ ready --lease--> leased --report--> ready
 2. 节点分配、租约唯一性、幂等重放和无可用节点冲突。
 3. 探针首写、同键重放、同键异载荷冲突和释放冲突。
 4. 一致性通过、审核触发、最新结果查询和幂等重放。
+5. 节点档案受控更新：版本匹配下更换区域、隔离升级、租约中拒绝、已隔离锁定和重名登记兼容。
 
 每条探针使用独立临时目录，不访问外部网络，结束后关闭服务。

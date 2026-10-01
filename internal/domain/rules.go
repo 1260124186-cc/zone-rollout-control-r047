@@ -40,6 +40,40 @@ func CompletePlan(plan *RolloutPlan, now time.Time) error {
 	return nil
 }
 
+// ExpireDueLeases transitions claimed leases past their deadline to expired
+// and returns the matching leased nodes to ready. It returns the number of
+// leases that expired.
+func ExpireDueLeases(state *State, now time.Time) int {
+	count := 0
+	for leaseID, lease := range state.Leases {
+		if lease.State != LeaseClaimed || lease.ExpiresAt.After(now) {
+			continue
+		}
+		finishedAt := now.UTC()
+		lease.State = LeaseExpired
+		lease.FinishedAt = &finishedAt
+		state.Leases[leaseID] = lease
+		if node, ok := state.Nodes[lease.NodeID]; ok && node.State == NodeLeased {
+			node.State = NodeReady
+			node.Version++
+			node.UpdatedAt = finishedAt
+			state.Nodes[node.ID] = node
+		}
+		count++
+	}
+	return count
+}
+
+// NodeHasActiveLease reports whether the node currently owns a claimed lease.
+func NodeHasActiveLease(state *State, nodeID string) bool {
+	for _, lease := range state.Leases {
+		if lease.NodeID == nodeID && lease.State == LeaseClaimed {
+			return true
+		}
+	}
+	return false
+}
+
 func LeaseFingerprint(planID string, input LeaseInput) string {
 	payload := fmt.Sprintf(
 		"%s|%s|%s|%d|%d",

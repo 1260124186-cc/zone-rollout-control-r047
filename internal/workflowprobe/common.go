@@ -15,6 +15,23 @@ func enrollNode(harness *harness, name string, region string) (domain.ResolverNo
 	return node, err
 }
 
+func updateNode(
+	harness *harness,
+	name string,
+	region string,
+	quarantine bool,
+	expectedVersion uint64,
+) (domain.ResolverNode, error) {
+	var node domain.ResolverNode
+	err := harness.call(http.MethodPatch, "/v1/nodes", domain.NodeUpdateInput{
+		NodeName:        name,
+		Region:          region,
+		Quarantine:      quarantine,
+		ExpectedVersion: expectedVersion,
+	}, &node)
+	return node, err
+}
+
 func createActivePlan(
 	harness *harness,
 	zone string,

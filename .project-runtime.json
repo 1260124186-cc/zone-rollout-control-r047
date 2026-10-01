@@ -17,6 +17,10 @@
       "command": "go run ./cmd/workflowprobe node-lease-allocation"
     },
     {
+      "workflow_id": "node-profile-update",
+      "command": "go run ./cmd/workflowprobe node-profile-update"
+    },
+    {
       "workflow_id": "probe-ingestion",
       "command": "go run ./cmd/workflowprobe probe-ingestion"
     },

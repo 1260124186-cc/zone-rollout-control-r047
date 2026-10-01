@@ -64,6 +64,19 @@ curl -sS -X PUT http://127.0.0.1:8090/v1/nodes \
   }'
 ```
 
+受控更新节点档案（按当前名称定位，必须提交当前版本；只适用于没有活动租约的 `ready` 节点）：
+
+```bash
+curl -sS -X PATCH http://127.0.0.1:8090/v1/nodes \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "node_name": "resolver-east-01",
+    "region": "north",
+    "quarantine": false,
+    "expected_version": 1
+  }'
+```
+
 创建滚动计划：
 
 ```bash
@@ -166,6 +179,7 @@ curl -sS -X PATCH http://127.0.0.1:8090/v1/plans/<plan_id>/assessments \
 | --- | --- | --- |
 | `GET` | `/healthz` | 进程健康检查 |
 | `PUT` | `/v1/nodes` | 登记解析节点 |
+| `PATCH` | `/v1/nodes` | 受控更新节点区域或隔离状态 |
 | `GET` | `/v1/nodes` | 按状态和区域分页查询节点 |
 | `PUT` | `/v1/plans` | 创建计划草稿 |
 | `GET` | `/v1/plans` | 按状态分页查询计划 |
@@ -185,6 +199,9 @@ curl -sS -X PATCH http://127.0.0.1:8090/v1/plans/<plan_id>/assessments \
 - 区域版本只在计划草稿状态可追加，序列号严格递增且内容不可变。
 - A、AAAA、CNAME 条目在写入前规范化并稳定排序，重复条目直接拒绝。
 - 节点按 `ready -> leased -> ready` 变化，隔离节点不会被选中。
+- 没有活动租约的 `ready` 节点可按名称受控更新：提交当前版本，成功后版本递增并在审计中记录字段前后值；节点标识不变，后续分配使用新区域，历史租约仍引用同一节点。
+- `leased` 节点和已 `quarantined` 节点的更新返回 `invalid_state`，版本不匹配返回 `version_conflict`，名称不存在返回 `not_found`；隔离只能升级不能通过此接口解除。
+- 首次登记的重名冲突和其他既有错误保持不变。
 - 一个节点同一时刻最多有一个 `claimed` 租约。
 - 相同请求键和相同内容可安全重放；同键异载荷返回 `idempotency_conflict`。
 - 一致性判定综合节点覆盖率、序列号、成功比例和最大延迟，返回 `consistent` 或 `review_required`。
@@ -214,6 +231,7 @@ curl -sS -X PATCH http://127.0.0.1:8090/v1/plans/<plan_id>/assessments \
 ```bash
 go run ./cmd/workflowprobe plan-revision-lifecycle
 go run ./cmd/workflowprobe node-lease-allocation
+go run ./cmd/workflowprobe node-profile-update
 go run ./cmd/workflowprobe probe-ingestion
 go run ./cmd/workflowprobe consistency-assessment
 ```

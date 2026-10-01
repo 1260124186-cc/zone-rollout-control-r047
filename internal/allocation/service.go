@@ -181,22 +181,5 @@ func (s *Service) ExpireDue(ctx context.Context) (int, error) {
 }
 
 func expireLeases(state *domain.State, now time.Time) int {
-	count := 0
-	for leaseID, lease := range state.Leases {
-		if lease.State != domain.LeaseClaimed || lease.ExpiresAt.After(now) {
-			continue
-		}
-		finishedAt := now
-		lease.State = domain.LeaseExpired
-		lease.FinishedAt = &finishedAt
-		state.Leases[leaseID] = lease
-		if node, ok := state.Nodes[lease.NodeID]; ok && node.State == domain.NodeLeased {
-			node.State = domain.NodeReady
-			node.Version++
-			node.UpdatedAt = now
-			state.Nodes[node.ID] = node
-		}
-		count++
-	}
-	return count
+	return domain.ExpireDueLeases(state, now)
 }

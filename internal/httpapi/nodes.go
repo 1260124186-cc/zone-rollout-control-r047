@@ -22,6 +22,20 @@ func (s *Server) enrollNode(w http.ResponseWriter, r *http.Request) {
 	sendData(w, r, http.StatusCreated, node)
 }
 
+func (s *Server) updateNode(w http.ResponseWriter, r *http.Request) {
+	var input domain.NodeUpdateInput
+	if err := decode(w, r, &input); err != nil {
+		sendError(w, r, err)
+		return
+	}
+	node, err := s.fleet.UpdateProfile(r.Context(), input)
+	if err != nil {
+		sendError(w, r, err)
+		return
+	}
+	sendData(w, r, http.StatusOK, node)
+}
+
 func (s *Server) listNodes(w http.ResponseWriter, r *http.Request) {
 	limit := 50
 	if raw := strings.TrimSpace(r.URL.Query().Get("limit")); raw != "" {

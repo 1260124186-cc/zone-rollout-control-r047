@@ -37,6 +37,13 @@ type NodeCreateInput struct {
 	Quarantine bool   `json:"quarantine"`
 }
 
+type NodeUpdateInput struct {
+	NodeName        string `json:"node_name"`
+	Region          string `json:"region"`
+	Quarantine      bool   `json:"quarantine"`
+	ExpectedVersion uint64 `json:"expected_version"`
+}
+
 type LeaseInput struct {
 	RequestKey   string `json:"request_key"`
 	Region       string `json:"region"`
@@ -192,6 +199,31 @@ func ValidateNodeInput(input NodeCreateInput, now time.Time) error {
 }
 
 func NormalizeNodeInput(input NodeCreateInput) NodeCreateInput {
+	input.NodeName = canonicalName(input.NodeName)
+	input.Region = strings.TrimSpace(strings.ToLower(input.Region))
+	return input
+}
+
+func ValidateNodeUpdateInput(input NodeUpdateInput) error {
+	input.NodeName = canonicalName(input.NodeName)
+	input.Region = strings.TrimSpace(strings.ToLower(input.Region))
+	details := make(map[string]any)
+	if err := validateCanonicalName(input.NodeName); err != nil {
+		details["node_name"] = err.Error()
+	}
+	if count := utf8.RuneCountInString(input.Region); count < 2 || count > MaxRegionRunes {
+		details["region"] = "must contain between 2 and 48 characters"
+	}
+	if input.ExpectedVersion == 0 {
+		details["expected_version"] = "must be greater than zero"
+	}
+	if len(details) > 0 {
+		return Validation("node update input is invalid", details)
+	}
+	return nil
+}
+
+func NormalizeNodeUpdateInput(input NodeUpdateInput) NodeUpdateInput {
 	input.NodeName = canonicalName(input.NodeName)
 	input.Region = strings.TrimSpace(strings.ToLower(input.Region))
 	return input
